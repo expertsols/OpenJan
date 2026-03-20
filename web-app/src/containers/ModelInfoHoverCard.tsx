@@ -98,8 +98,6 @@ export const ModelInfoHoverCard = ({
     }
   }
 
-  if(model.is_mlx) return null
-
   return (
     <HoverCard>
       <HoverCardTrigger asChild onMouseEnter={handleMouseEnter}>

@@ -7,7 +7,6 @@
  *
  * Supported Providers:
  * - llamacpp: Local models via llama.cpp (requires running session)
- * - mlx: Local models via MLX-Swift on Apple Silicon (requires running session)
  * - anthropic: Claude models via Anthropic API (@ai-sdk/anthropic v2.0)
  * - google/gemini: Gemini models via Google Generative AI API (@ai-sdk/google v2.0)
  * - openai: OpenAI models via OpenAI API (@ai-sdk/openai)
@@ -71,9 +70,8 @@ interface LlamaCppChunk {
 }
 
 /**
- * Custom metadata extractor for MLX that extracts timing information
- * and converts it to token usage format. MLX uses the same timing structure
- * as llama.cpp.
+ * Custom metadata extractor for OpenAI-compatible local inference (e.g. llama.cpp)
+ * that maps timing fields to token usage metadata.
  */
 const providerMetadataExtractor: MetadataExtractor = {
   extractMetadata: async ({ parsedBody }: { parsedBody: unknown }) => {
@@ -161,12 +159,6 @@ export class ModelFactory {
       case 'llamacpp':
         return this.createLlamaCppModel(modelId, provider, parameters)
 
-      case 'mlx':
-        return this.createMlxModel(modelId, provider, parameters)
-
-      case 'foundation-models':
-        return this.createFoundationModelsModel(modelId, provider, parameters)
-
       case 'anthropic':
         return this.createAnthropicModel(modelId, provider)
 
@@ -242,178 +234,6 @@ export class ModelFactory {
         return url.toString()
       },
       includeUsage: true,
-      fetch: customFetch,
-      metadataExtractor: providerMetadataExtractor,
-    })
-
-    return wrapLanguageModel({
-      model,
-      middleware: extractReasoningMiddleware({
-        tagName: 'think',
-        separator: '\n',
-      }),
-    })
-  }
-
-  /**
-   * Create an MLX model by starting the model and finding the running session.
-   * MLX uses the same OpenAI-compatible API pattern as llamacpp.
-   */
-  private static async createMlxModel(
-    modelId: string,
-    provider?: ProviderObject,
-    parameters: Record<string, unknown> = {}
-  ): Promise<LanguageModel> {
-    // Start the model first if provider is available
-    if (provider) {
-      try {
-        const { useServiceStore } = await import('@/hooks/useServiceHub')
-        const serviceHub = useServiceStore.getState().serviceHub
-
-        if (serviceHub) {
-          await serviceHub.models().startModel(provider, modelId)
-        }
-      } catch (error) {
-        console.error('Failed to start MLX model:', error)
-        throw new Error(
-          `Failed to start model: ${error instanceof Error ? error.message : JSON.stringify(error)}`
-        )
-      }
-    }
-
-    // Get session info which includes port and api_key
-    const sessionInfo = await invoke<SessionInfo | null>(
-      'plugin:mlx|find_mlx_session_by_model',
-      { modelId }
-    )
-
-    if (!sessionInfo) {
-      throw new Error(`No running MLX session found for model: ${modelId}`)
-    }
-
-    const baseUrl = `http://localhost:${sessionInfo.port}`
-    const authHeaders = {
-      Authorization: `Bearer ${sessionInfo.api_key}`,
-      Origin: 'tauri://localhost',
-    }
-
-    // Custom fetch that merges parameters and calls /cancel on abort
-    const customFetch: typeof httpFetch = async (
-      input: RequestInfo | URL,
-      init?: RequestInit
-    ): Promise<Response> => {
-      if (init?.method === 'POST' || !init?.method) {
-        const body = init?.body ? JSON.parse(init.body as string) : {}
-        const mergedBody = { ...body, ...parameters }
-        init = { ...init, body: JSON.stringify(mergedBody) }
-      }
-
-      // When the request is aborted, also call the server's /cancel endpoint
-      // to stop MLX inference immediately
-      if (init?.signal) {
-        init.signal.addEventListener('abort', () => {
-          httpFetch(`${baseUrl}/v1/cancel`, {
-            method: 'POST',
-            headers: { ...authHeaders, 'Content-Type': 'application/json' },
-            body: JSON.stringify({}),
-          }).catch(() => {
-            // Ignore cancel request errors
-          })
-        })
-      }
-
-      return httpFetch(input, init)
-    }
-
-    const model = new OpenAICompatibleChatLanguageModel(modelId, {
-      provider: 'mlx',
-      headers: () => authHeaders,
-      url: ({ path }) => {
-        const url = new URL(`${baseUrl}/v1${path}`)
-        return url.toString()
-      },
-      fetch: customFetch,
-      metadataExtractor: providerMetadataExtractor,
-    })
-
-    return wrapLanguageModel({
-      model: model,
-      middleware: extractReasoningMiddleware({
-        tagName: 'think',
-        separator: '\n',
-      }),
-    })
-  }
-
-  /**
-   * Create a Foundation Models model (Apple on-device) by starting the local
-   * Swift server via the Tauri plugin and connecting over localhost.
-   */
-  private static async createFoundationModelsModel(
-    modelId: string,
-    provider?: ProviderObject,
-    parameters: Record<string, unknown> = {}
-  ): Promise<LanguageModel> {
-    const availability = await invoke<string>(
-      'plugin:foundation-models|check_foundation_models_availability',
-      {}
-    )
-
-    if (availability !== 'available') {
-      const messages: Record<string, string> = {
-        notEligible:
-          'Apple Intelligence is not supported on this device. An Apple Silicon Mac (M1 or later) with macOS 26+ is required.',
-        appleIntelligenceNotEnabled:
-          'Apple Intelligence is not enabled. Please enable it in System Settings > Apple Intelligence & Siri.',
-        modelNotReady:
-          'The Apple on-device model is still preparing. Please wait and try again shortly.',
-        binaryNotFound:
-          'The Foundation Models server binary is missing. Please reinstall Jan.',
-        unavailable:
-          'Apple Foundation Models are currently unavailable on this device.',
-      }
-      throw new Error(messages[availability] ?? messages.unavailable)
-    }
-
-    if (provider) {
-      try {
-        const { useServiceStore } = await import('@/hooks/useServiceHub')
-        const serviceHub = useServiceStore.getState().serviceHub
-
-        if (serviceHub) {
-          await serviceHub.models().startModel(provider, modelId)
-        }
-      } catch (error) {
-        console.error('Failed to start Foundation Models:', error)
-        throw new Error(
-          `Failed to start model: ${error instanceof Error ? error.message : JSON.stringify(error)}`
-        )
-      }
-    }
-
-    const sessionInfo = await invoke<SessionInfo | null>(
-      'plugin:foundation-models|find_foundation_models_session',
-      {}
-    )
-
-    if (!sessionInfo) {
-      throw new Error(
-        'No running Foundation Models session. The server may have failed to start — please check the logs.'
-      )
-    }
-
-    const baseUrl = `http://localhost:${sessionInfo.port}`
-    const authHeaders = {
-      Authorization: `Bearer ${sessionInfo.api_key}`,
-      Origin: 'tauri://localhost',
-    }
-
-    const customFetch = createCustomFetch(httpFetch, parameters)
-
-    const model = new OpenAICompatibleChatLanguageModel(modelId, {
-      provider: 'foundation-models',
-      headers: () => authHeaders,
-      url: ({ path }) => new URL(`${baseUrl}/v1${path}`).toString(),
       fetch: customFetch,
       metadataExtractor: providerMetadataExtractor,
     })

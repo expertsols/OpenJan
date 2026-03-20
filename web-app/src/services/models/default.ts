@@ -150,15 +150,10 @@ export class DefaultModelsService implements ModelsService {
       }
     })
 
-    // Extract safetensors files (MLX models)
     const safetensorsFiles =
       repo.siblings?.filter((file) =>
         file.rfilename.toLowerCase().endsWith('.safetensors')
       ) || []
-
-    // Check if this repository has MLX model files (safetensors + associated files)
-    const hasMlxFiles =
-      repo.library_name === 'mlx' || repo.tags?.includes('mlx')
 
     const safetensorsModels = safetensorsFiles.map((file) => {
       // Generate model_id from filename (remove .safetensors extension, case-insensitive)
@@ -183,7 +178,6 @@ export class DefaultModelsService implements ModelsService {
       mmproj_models: mmprojModels,
       safetensors_files: safetensorsModels,
       num_safetensors: safetensorsModels.length,
-      is_mlx: hasMlxFiles,
       readme: `https://huggingface.co/${repo.modelId}/resolve/main/README.md`,
       description: `**Tags**: ${repo.tags?.join(', ')}`,
     }
@@ -304,12 +298,10 @@ export class DefaultModelsService implements ModelsService {
 
   async abortDownload(id: string): Promise<void> {
     const llamacppEngine = this.getEngine('llamacpp')
-    const mlxEngine = this.getEngine('mlx')
     try {
-      await Promise.allSettled([
-        llamacppEngine?.abortImport(id),
-        mlxEngine?.abortImport(id),
-      ].filter(Boolean))
+      await Promise.allSettled(
+        [llamacppEngine?.abortImport(id)].filter(Boolean)
+      )
     } finally {
       events.emit(DownloadEvent.onFileDownloadStopped, {
         modelId: id,
@@ -339,9 +331,6 @@ export class DefaultModelsService implements ModelsService {
       await Promise.all(
         llamaCppModels.map((model) => this.stopModel(model, 'llamacpp'))
       )
-    const mlxModels = await this.getActiveModels('mlx')
-    if (mlxModels)
-      await Promise.all(mlxModels.map((model) => this.stopModel(model, 'mlx')))
   }
 
   async startModel(

@@ -137,13 +137,6 @@ export function ModelSetting({
             acc.push(entry)
             return acc
           }, [])
-          .filter(([key]) => {
-            // MLX models only support context size setting
-            if (provider.provider === 'mlx') {
-              return key === 'ctx_len'
-            }
-            return true
-          })
           .map(([key, value]) => {
             const config = value as ProviderSetting
             return (

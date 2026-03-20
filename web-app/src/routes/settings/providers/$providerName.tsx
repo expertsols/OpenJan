@@ -11,7 +11,6 @@ import { DynamicControllerSetting } from '@/containers/dynamicControllerSetting'
 import { RenderMarkdown } from '@/containers/RenderMarkdown'
 import { DialogEditModel } from '@/containers/dialogs/EditModel'
 import { ImportVisionModelDialog } from '@/containers/dialogs/ImportVisionModelDialog'
-import { ImportMlxModelDialog } from '@/containers/dialogs/ImportMlxModelDialog'
 import { ModelSetting } from '@/containers/ModelSetting'
 import { DialogDeleteModel } from '@/containers/dialogs/DeleteModel'
 import { FavoriteModelAction } from '@/containers/FavoriteModelAction'
@@ -66,9 +65,9 @@ function ProviderDetail() {
   const { getProviderByName, setProviders, updateProvider } = useModelProvider()
   const provider = getProviderByName(providerName)
 
-  // Check if llamacpp/mlx provider needs backend configuration
+  // Check if llamacpp provider needs backend configuration
   const needsBackendConfig =
-    (provider?.provider === 'llamacpp' || provider?.provider === 'mlx') &&
+    provider?.provider === 'llamacpp' &&
     provider.settings?.some(
       (setting) =>
         setting.key === 'version_backend' &&
@@ -302,8 +301,7 @@ function ProviderDetail() {
   }
 
   const handleCheckForBackendUpdate = useCallback(async () => {
-    if (provider?.provider !== 'llamacpp' && provider?.provider !== 'mlx')
-      return
+    if (provider?.provider !== 'llamacpp') return
 
     setIsCheckingBackendUpdate(true)
     try {
@@ -321,8 +319,7 @@ function ProviderDetail() {
   }, [provider, checkForBackendUpdate, t])
 
   const handleInstallBackendFromFile = useCallback(async () => {
-    if (provider?.provider !== 'llamacpp' && provider?.provider !== 'mlx')
-      return
+    if (provider?.provider !== 'llamacpp') return
 
     setIsInstallingBackend(true)
     try {
@@ -348,11 +345,8 @@ function ProviderDetail() {
         const fileName = basenameNoExt(selectedFile).replace(/\s+/g, '-')
 
         // Capitalize provider name for display
-        const providerDisplayName =
-          provider?.provider === 'llamacpp' ? 'Llamacpp' : 'MLX'
-
         toast.success(t('settings:backendInstallSuccess'), {
-          description: `${providerDisplayName} ${fileName} installed`,
+          description: `Llamacpp ${fileName} installed`,
         })
 
         // Refresh settings to update backend configuration
@@ -395,10 +389,7 @@ function ProviderDetail() {
             <div
               className={cn(
                 'flex flex-col gap-3',
-                provider &&
-                  (provider.provider === 'llamacpp' ||
-                    provider.provider === 'mlx') &&
-                  'flex-col-reverse'
+                provider && provider.provider === 'llamacpp' && 'flex-col-reverse'
               )}
             >
               {/* Settings */}
@@ -543,8 +534,7 @@ function ProviderDetail() {
                               </div>
                             )}
                           {setting.key === 'version_backend' &&
-                            (provider?.provider === 'llamacpp' ||
-                              provider?.provider === 'mlx') && (
+                            provider?.provider === 'llamacpp' && (
                               <div className="mt-2 flex flex-wrap gap-2">
                                 <Button
                                   variant="outline"
@@ -607,7 +597,7 @@ function ProviderDetail() {
                       {t('providers:models')}
                     </h1>
                     <div className="flex items-center gap-2">
-                      {provider && provider.provider !== 'llamacpp' && provider.provider !== 'mlx' && (
+                      {provider && provider.provider !== 'llamacpp' && (
                         <>
                           <Button
                             variant="secondary"
@@ -650,21 +640,6 @@ function ProviderDetail() {
                           }
                         />
                       )}
-                      {provider && provider.provider === 'mlx' && (
-                          <ImportMlxModelDialog
-                            provider={provider}
-                            onSuccess={handleModelImportSuccess}
-                            trigger={
-                              <Button variant="secondary" size="sm">
-                                <IconFolderPlus
-                                  size={18}
-                                  className="text-muted-foreground"
-                                />
-                                <span>{t('providers:import')}</span>
-                              </Button>
-                            }
-                          />
-                        )}
                     </div>
                   </div>
                 }
@@ -710,9 +685,7 @@ function ProviderDetail() {
                               provider={provider}
                               modelId={model.id}
                             />
-                            {provider &&
-                              (provider.provider === 'llamacpp' ||
-                                provider.provider === 'mlx') && (
+                            {provider && provider.provider === 'llamacpp' && (
                                 <div className="ml-2">
                                   {activeModels.some(
                                     (activeModel) => activeModel === model.id

@@ -439,7 +439,7 @@ export function DownloadManagement() {
                         <div className="shrink-0 flex items-center space-x-0.5">
                           <Button variant="secondary" size="icon-xs" onClick={() => {
                               // TODO: Consolidate cancellation logic
-                              if (download.id.startsWith('llamacpp') || download.id.startsWith('mlx')) {
+                              if (download.id.startsWith('llamacpp')) {
                                 const downloadManager =
                                   window.core.extensionManager.getByName(
                                     '@janhq/download-extension'

@@ -89,7 +89,7 @@ function ModelProviders() {
                 </div>
               }
             >
-              {providers.filter((provider) => IS_MACOS || provider.provider !== 'mlx').map((provider, index) => (
+              {providers.map((provider, index) => (
                 <CardItem
                   key={index}
                   title={

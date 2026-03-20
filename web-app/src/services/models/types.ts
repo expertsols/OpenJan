@@ -40,7 +40,6 @@ export interface CatalogModel {
   created_at?: string
   readme?: string
   tools?: boolean
-  is_mlx?: boolean
 }
 
 export type ModelCatalog = CatalogModel[]
