@@ -120,9 +120,7 @@ jan/
 │   ├── conversational-extension/
 │   ├── download-extension/
 │   └── llamacpp-extension/
-├── docs/                 # Documentation website
 ├── website/              # Marketing website
-├── autoqa/               # Automated testing
 ├── scripts/              # Build utilities
 │
 ├── package.json          # Root workspace configuration
